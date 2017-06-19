@@ -5,32 +5,49 @@ use std::iter::FromIterator;
 
 
 fn main() {
-    let (pattern, guessed) = read_args();
+    let pattern = read_args();
     let guess_dict = best_guess_dictionary(&pattern);
-    let mut guess_dict_filtered = guess_dict
-        .iter()
-        .filter(|c| !guessed.contains(c));
 
-    println!("{}", guess_dict_filtered.next().map_or(String::from("Guess at random"),
+    println!("{}", guess_dict.get(0).map_or(String::from("Guess at random"),
                                   |c| c.to_string()));
 }
 
-fn read_args() -> (String,  HashSet<char>) {
+struct Pattern {
+    pattern: String,
+    seen: HashSet<char>
+}
+
+impl Pattern {
+    fn matches(&self, candidate: &str) -> bool {
+        if candidate.len() != self.pattern.len() {
+            return false;
+        }
+
+        self.pattern.chars().zip(candidate.chars())
+            .all(|(p, c)| p == c ||
+                 (p == '_' && !self.seen.contains(&c)))
+    }
+}
+
+fn read_args() -> Pattern {
     let pattern = args().nth(1).unwrap();
     let guessed = args().nth(2).unwrap_or(String::new());
     let mut guessed_set = HashSet::from_iter(guessed.chars());
     guessed_set.extend(pattern.chars()
                         .filter(|&c| c != '_'));
 
-    (pattern, guessed_set)
+    Pattern {
+        pattern: pattern,
+        seen: guessed_set
+    }
 }
 
 const DICT: &str = include_str!("dict.txt");
 
-fn best_guess_dictionary(pattern: &str) -> Vec<char> {
+fn best_guess_dictionary(pattern: &Pattern) -> Vec<char> {
     let mut counts: HashMap<char, u16> = HashMap::new();
     for word in DICT.lines() {
-        if matches_pattern(pattern, word) {
+        if pattern.matches(word) {
             for c in completions(pattern, word) {
                 let count = counts.entry(c).or_insert(0);
                 *count += 1;
@@ -47,23 +64,8 @@ fn best_guess_dictionary(pattern: &str) -> Vec<char> {
         .collect()
 }
 
-fn matches_pattern(pattern: &str, candidate: &str) -> bool {
-    if candidate.len() != pattern.len() {
-        return false;
-    }
-
-    for (p, c) in pattern.chars().zip(candidate.chars()) {
-        if p != '_' &&
-            p != c {
-            return false;
-        }
-    }
-
-    true
-}
-
-fn completions(pattern: &str, candidate: &str) -> HashSet<char> {
-    let options = pattern.chars().zip(candidate.chars())
+fn completions(pattern: &Pattern, candidate: &str) -> HashSet<char> {
+    let options = pattern.pattern.chars().zip(candidate.chars())
         .filter(|&(p, _)| p == '_')
         .map(|(_, c)| c);
     HashSet::from_iter(options)
