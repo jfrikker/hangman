@@ -28,6 +28,13 @@ impl Pattern {
             .all(|(p, c)| p == c ||
                  (p == '_' && !self.seen.contains(&c)))
     }
+
+    fn unfilled_chars(&self, candidate: &str) -> HashSet<char> {
+        self.pattern.chars().zip(candidate.chars())
+            .filter(|&(p, _)| p == '_')
+            .map(|(_, c)| c)
+            .collect()
+    }
 }
 
 fn read_args() -> Pattern {
@@ -50,7 +57,7 @@ const DICT: &str = include_str!("dict.txt");
 fn best_guess_dictionary(pattern: &Pattern) -> Vec<char> {
     let counts: Counted<char> = DICT.lines()
         .filter(|w| pattern.matches(w))
-        .flat_map(|w| completions(pattern, w))
+        .flat_map(|w| pattern.unfilled_chars(w))
         .collect();
 
     counts.desc()
@@ -95,11 +102,4 @@ impl<T> FromIterator<T> for Counted<T>
 
         counts
     }
-}
-
-fn completions(pattern: &Pattern, candidate: &str) -> HashSet<char> {
-    pattern.pattern.chars().zip(candidate.chars())
-        .filter(|&(p, _)| p == '_')
-        .map(|(_, c)| c)
-        .collect()
 }
