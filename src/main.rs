@@ -33,9 +33,11 @@ impl Pattern {
 fn read_args() -> Pattern {
     let pattern = args().nth(1).unwrap();
     let guessed = args().nth(2).unwrap_or(String::new());
-    let mut guessed_set = HashSet::from_iter(guessed.chars());
-    guessed_set.extend(pattern.chars()
-                        .filter(|&c| c != '_'));
+
+    let guessed_set = pattern.chars()
+        .filter(|&c| c != '_')
+        .chain(guessed.chars())
+        .collect();
 
     Pattern {
         pattern: pattern,
