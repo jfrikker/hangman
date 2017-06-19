@@ -1,3 +1,4 @@
+use std::hash::Hash;
 use std::collections::hash_map::HashMap;
 use std::collections::hash_set::HashSet;
 use std::env::args;
@@ -45,28 +46,58 @@ fn read_args() -> Pattern {
 const DICT: &str = include_str!("dict.txt");
 
 fn best_guess_dictionary(pattern: &Pattern) -> Vec<char> {
-    let mut counts: HashMap<char, u16> = HashMap::new();
-    for word in DICT.lines() {
-        if pattern.matches(word) {
-            for c in completions(pattern, word) {
-                let count = counts.entry(c).or_insert(0);
-                *count += 1;
-            }
+    let counts: Counted<char> = DICT.lines()
+        .filter(|w| pattern.matches(w))
+        .flat_map(|w| completions(pattern, w))
+        .collect();
+
+    counts.desc()
+}
+
+struct Counted<T> {
+    counts: HashMap<T, u16>
+}
+
+impl<T> Counted<T>
+    where T: Hash + Eq + Copy {
+    fn new() -> Counted<T> {
+        Counted {
+            counts: HashMap::new()
         }
     }
 
-    let mut pairs: Vec<(char, u16)> = counts.drain()
-        .collect();
-    pairs.sort_by(|&(_, count1), &(_, count2)| count2.cmp(&count1));
+    fn inc(&mut self, key: T) {
+        let count = self.counts.entry(key).or_insert(0);
+        *count += 1;
+    }
 
-    pairs.iter()
-        .map(|&(c, _)| c)
-        .collect()
+    fn desc(mut self) -> Vec<T> {
+        let mut pairs: Vec<(T, u16)> = self.counts.drain()
+            .collect();
+        pairs.sort_by(|&(_, count1), &(_, count2)| count2.cmp(&count1));
+
+        pairs.iter()
+            .map(|&(c, _)| c)
+            .collect()
+    }
+}
+
+impl<T> FromIterator<T> for Counted<T>
+    where T: Hash + Eq + Copy {
+    fn from_iter<I: IntoIterator<Item=T>>(iter: I) -> Self {
+        let mut counts = Counted::new();
+
+        for item in iter {
+            counts.inc(item);
+        }
+
+        counts
+    }
 }
 
 fn completions(pattern: &Pattern, candidate: &str) -> HashSet<char> {
-    let options = pattern.pattern.chars().zip(candidate.chars())
+    pattern.pattern.chars().zip(candidate.chars())
         .filter(|&(p, _)| p == '_')
-        .map(|(_, c)| c);
-    HashSet::from_iter(options)
+        .map(|(_, c)| c)
+        .collect()
 }
